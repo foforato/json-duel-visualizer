@@ -38,7 +38,7 @@ interface RequestState {
 }
 
 // Create the store with proper initialization
-const useRequestStoreBase = create<RequestState>()(
+export const useRequestStoreBase = create<RequestState>()(
   persist(
     (set) => ({
       savedRequests: [],
@@ -106,21 +106,37 @@ const useRequestStoreBase = create<RequestState>()(
   )
 );
 
+// Type-safe SSR-friendly wrapper for the store
+// Fix: avoid type assertion and create a proper SSR fallback
+type UseRequestStoreType = typeof useRequestStoreBase;
+
 // Prevent SSR issues by creating a wrapper around the store
-export const useRequestStore = (() => {
-  // Make sure store is only accessed in browser environment
-  if (typeof window === 'undefined') {
-    return {
-      getState: () => ({ 
+export const useRequestStore: UseRequestStoreType = 
+  typeof window !== 'undefined' ? useRequestStoreBase : (() => {
+    // This is a type-compatible dummy implementation for SSR
+    // It will never be called on the client side
+    const emptyStore: UseRequestStoreType = () => {
+      return {
         savedRequests: [],
         addRequest: () => {},
         removeRequest: () => {},
         clearRequests: () => {},
         updateRequestStats: () => {}
-      }),
-      setState: () => {},
-      subscribe: () => () => {},
-    } as typeof useRequestStoreBase;
-  }
-  return useRequestStoreBase;
-})();
+      };
+    };
+    
+    // Add selector support
+    emptyStore.getState = () => ({
+      savedRequests: [],
+      addRequest: () => {},
+      removeRequest: () => {},
+      clearRequests: () => {},
+      updateRequestStats: () => {}
+    });
+    
+    // Add the other required methods
+    emptyStore.setState = () => {};
+    emptyStore.subscribe = () => () => {};
+    
+    return emptyStore;
+  })();
