@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 import UrlForm from "@/components/UrlForm";
 import JsonDiffViewer from "@/components/JsonDiffViewer";
+import { ApiRequest } from "@/components/UrlForm";
 
 const Index = () => {
   const [leftJson, setLeftJson] = useState<any>(null);
@@ -10,22 +11,27 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [leftError, setLeftError] = useState<string | undefined>(undefined);
   const [rightError, setRightError] = useState<string | undefined>(undefined);
+  const [leftStatus, setLeftStatus] = useState<number | undefined>(undefined);
+  const [rightStatus, setRightStatus] = useState<number | undefined>(undefined);
 
-  const fetchData = async (url1: string, url2: string) => {
+  const fetchData = async (request1: ApiRequest, request2: ApiRequest) => {
     setIsLoading(true);
     setLeftError(undefined);
     setRightError(undefined);
+    setLeftStatus(undefined);
+    setRightStatus(undefined);
     
     try {
       // Fetch data from both URLs in parallel
       const [leftResponse, rightResponse] = await Promise.allSettled([
-        fetchJson(url1),
-        fetchJson(url2)
+        fetchWithConfig(request1),
+        fetchWithConfig(request2)
       ]);
 
       // Handle first URL response
       if (leftResponse.status === "fulfilled") {
-        setLeftJson(leftResponse.value);
+        setLeftJson(leftResponse.value.data);
+        setLeftStatus(leftResponse.value.status);
       } else {
         setLeftError(`Erreur: ${leftResponse.reason?.message || "Impossible de récupérer les données"}`);
         setLeftJson(null);
@@ -33,7 +39,8 @@ const Index = () => {
 
       // Handle second URL response
       if (rightResponse.status === "fulfilled") {
-        setRightJson(rightResponse.value);
+        setRightJson(rightResponse.value.data);
+        setRightStatus(rightResponse.value.status);
       } else {
         setRightError(`Erreur: ${rightResponse.reason?.message || "Impossible de récupérer les données"}`);
         setRightJson(null);
@@ -49,26 +56,58 @@ const Index = () => {
     }
   };
 
-  // Helper function to fetch and parse JSON from a URL
-  const fetchJson = async (url: string) => {
+  // Helper function to fetch with full request configuration
+  const fetchWithConfig = async (request: ApiRequest) => {
     try {
-      // Add http:// prefix if missing
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url = "https://" + url;
+      // Prepare headers
+      const headers: HeadersInit = {};
+      request.headers.forEach(header => {
+        if (header.key && header.value) {
+          headers[header.key] = header.value;
+        }
+      });
+
+      // Prepare request options
+      const options: RequestInit = {
+        method: request.method,
+        headers,
+      };
+
+      // Add body for non-GET/HEAD requests
+      if (request.method !== 'GET' && request.method !== 'HEAD' && request.body) {
+        try {
+          // Try to parse as JSON first
+          JSON.parse(request.body);
+          options.body = request.body;
+        } catch (e) {
+          // If not valid JSON, send as plain text
+          options.body = request.body;
+        }
       }
 
-      const response = await fetch(url);
+      const response = await fetch(request.url, options);
+      
+      // Capture status code for display
+      const status = response.status;
       
       if (!response.ok) {
-        throw new Error(`Statut HTTP ${response.status}`);
+        throw new Error(`Statut HTTP ${status}`);
       }
       
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("La réponse n'est pas au format JSON");
+        // Try to parse it anyway, but inform the user
+        const text = await response.text();
+        try {
+          const data = JSON.parse(text);
+          return { data, status, warning: "La réponse n'indique pas un contenu JSON, mais a pu être analysée comme tel" };
+        } catch {
+          throw new Error("La réponse n'est pas au format JSON");
+        }
       }
       
-      return await response.json();
+      const data = await response.json();
+      return { data, status };
     } catch (error: any) {
       // Re-throw to be handled by the caller
       throw error;
@@ -94,6 +133,8 @@ const Index = () => {
           rightJson={rightJson}
           leftError={leftError}
           rightError={rightError}
+          leftStatus={leftStatus}
+          rightStatus={rightStatus}
         />
       )}
     </div>

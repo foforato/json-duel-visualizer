@@ -14,13 +14,17 @@ interface JsonDiffViewerProps {
   rightJson: any;
   leftError?: string;
   rightError?: string;
+  leftStatus?: number;
+  rightStatus?: number;
 }
 
 const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
   leftJson,
   rightJson,
   leftError,
-  rightError
+  rightError,
+  leftStatus,
+  rightStatus
 }) => {
   const [onlyShowDiff, setOnlyShowDiff] = useState(false);
   const [viewMode, setViewMode] = useState<"split" | "unified">("split");
@@ -58,6 +62,28 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
   const updateDiffCount = useCallback((count: number) => {
     setDiffCount(count);
   }, []);
+
+  // Helper function to format HTTP status
+  const formatStatusCode = (status?: number) => {
+    if (!status) return null;
+    
+    let statusClass = "";
+    if (status >= 200 && status < 300) {
+      statusClass = "bg-green-100 text-green-800";
+    } else if (status >= 400 && status < 500) {
+      statusClass = "bg-yellow-100 text-yellow-800";
+    } else if (status >= 500) {
+      statusClass = "bg-red-100 text-red-800";
+    } else {
+      statusClass = "bg-gray-100 text-gray-800";
+    }
+    
+    return (
+      <span className={`rounded px-2 py-0.5 text-xs font-medium ${statusClass}`}>
+        {status}
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -126,7 +152,10 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x">
             <div className="p-4 overflow-auto max-h-[70vh]">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">Premier JSON</h3>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  Premier JSON
+                  {formatStatusCode(leftStatus)}
+                </h3>
                 {leftJson && (
                   <Button
                     variant="ghost"
@@ -159,7 +188,10 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
             
             <div className="p-4 overflow-auto max-h-[70vh]">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">Deuxième JSON</h3>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  Deuxième JSON
+                  {formatStatusCode(rightStatus)}
+                </h3>
                 {rightJson && (
                   <Button
                     variant="ghost"
@@ -192,7 +224,12 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
         ) : (
           <div className="p-4 overflow-auto max-h-[70vh]">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-medium">Vue unifiée</h3>
+              <div className="flex items-center gap-4">
+                <h3 className="text-sm font-medium">Vue unifiée</h3>
+                <div className="flex items-center gap-2">
+                  {formatStatusCode(leftStatus)} → {formatStatusCode(rightStatus)}
+                </div>
+              </div>
               {leftJson && (
                 <Button
                   variant="ghost"
