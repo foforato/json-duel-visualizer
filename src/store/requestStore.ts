@@ -1,6 +1,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { StoreApi, UseBoundStore } from "zustand";
 
 export interface SavedRequest {
   id: string;
@@ -106,37 +107,30 @@ export const useRequestStoreBase = create<RequestState>()(
   )
 );
 
-// Type-safe SSR-friendly wrapper for the store
-// Fix: avoid type assertion and create a proper SSR fallback
-type UseRequestStoreType = typeof useRequestStoreBase;
+// Define the initial state for SSR
+const initialState: RequestState = {
+  savedRequests: [],
+  addRequest: () => {},
+  removeRequest: () => {},
+  clearRequests: () => {},
+  updateRequestStats: () => {}
+};
 
-// Prevent SSR issues by creating a wrapper around the store
-export const useRequestStore: UseRequestStoreType = 
-  typeof window !== 'undefined' ? useRequestStoreBase : (() => {
-    // This is a type-compatible dummy implementation for SSR
-    // It will never be called on the client side
-    const emptyStore: UseRequestStoreType = () => {
-      return {
-        savedRequests: [],
-        addRequest: () => {},
-        removeRequest: () => {},
-        clearRequests: () => {},
-        updateRequestStats: () => {}
-      };
-    };
-    
-    // Add selector support
-    emptyStore.getState = () => ({
-      savedRequests: [],
-      addRequest: () => {},
-      removeRequest: () => {},
-      clearRequests: () => {},
-      updateRequestStats: () => {}
-    });
-    
-    // Add the other required methods
-    emptyStore.setState = () => {};
-    emptyStore.subscribe = () => () => {};
-    
-    return emptyStore;
-  })();
+// Use type assertion to safely handle SSR
+export const useRequestStore = typeof window !== 'undefined' 
+  ? useRequestStoreBase 
+  : ((() => {
+      let storeState = initialState;
+      
+      const store = () => storeState;
+      
+      // Add all the required methods to make TypeScript happy
+      store.getState = () => storeState;
+      store.setState = () => {};
+      store.subscribe = () => () => {};
+      store.getInitialState = () => initialState;
+      store.destroy = () => {};
+      
+      // Return the store with proper type assertion
+      return store as typeof useRequestStoreBase;
+    })());
