@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useRequestStore, type SavedRequest } from "@/store/requestStore";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -26,7 +26,22 @@ interface RequestHistoryProps {
 }
 
 const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
-  const { savedRequests, removeRequest, clearRequests } = useRequestStore();
+  // Fix: Initialize state before using store
+  const [storeReady, setStoreReady] = useState(false);
+  const [requests, setRequests] = useState<SavedRequest[]>([]);
+  
+  // Fix: Use store only after hydration
+  useEffect(() => {
+    setStoreReady(true);
+  }, []);
+  
+  const store = storeReady ? useRequestStore() : null;
+  
+  useEffect(() => {
+    if (store) {
+      setRequests(store.savedRequests);
+    }
+  }, [store, storeReady]);
 
   const handleSelectRequest = (request: SavedRequest) => {
     onSelectRequest(request);
@@ -35,21 +50,31 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
     });
   };
 
+  const handleClearRequests = () => {
+    if (store) {
+      store.clearRequests();
+      toast({
+        description: "Historique effacé",
+      });
+    }
+  };
+
+  const handleRemoveRequest = (id: string) => {
+    if (store) {
+      store.removeRequest(id);
+    }
+  };
+
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center justify-between px-2">
           <h2 className="text-lg font-semibold">Historique</h2>
-          {savedRequests.length > 0 && (
+          {requests.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                clearRequests();
-                toast({
-                  description: "Historique effacé",
-                });
-              }}
+              onClick={handleClearRequests}
             >
               <Trash className="h-4 w-4" />
             </Button>
@@ -62,13 +87,17 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
           <SidebarGroupLabel>Requêtes sauvegardées</SidebarGroupLabel>
           <SidebarGroupContent>
             <ScrollArea className="h-[calc(100vh-150px)]">
-              {savedRequests.length === 0 ? (
+              {!storeReady ? (
+                <div className="px-2 py-4 text-center text-muted-foreground text-sm">
+                  Chargement...
+                </div>
+              ) : requests.length === 0 ? (
                 <div className="px-2 py-4 text-center text-muted-foreground text-sm">
                   Aucune requête sauvegardée
                 </div>
               ) : (
                 <SidebarMenu>
-                  {savedRequests.map((request) => (
+                  {requests.map((request) => (
                     <SidebarMenuItem key={request.id}>
                       <SidebarMenuButton
                         onClick={() => handleSelectRequest(request)}
@@ -98,7 +127,7 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
       <SidebarFooter>
         <div className="px-3 py-2">
           <Badge variant="outline" className="w-full justify-center">
-            {savedRequests.length} requête(s)
+            {requests.length} requête(s)
           </Badge>
         </div>
       </SidebarFooter>

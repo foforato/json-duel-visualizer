@@ -31,6 +31,7 @@ interface RequestState {
   clearRequests: () => void;
 }
 
+// Fix: Create the store with proper initialization
 export const useRequestStore = create<RequestState>()(
   persist(
     (set) => ({
@@ -54,6 +55,32 @@ export const useRequestStore = create<RequestState>()(
     }),
     {
       name: "json-duel-requests",
+      // Fix: Add storage configuration
+      storage: {
+        getItem: (name) => {
+          try {
+            const value = localStorage.getItem(name);
+            return value ? JSON.parse(value) : null;
+          } catch (error) {
+            console.error('Error retrieving from localStorage:', error);
+            return null;
+          }
+        },
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, JSON.stringify(value));
+          } catch (error) {
+            console.error('Error storing in localStorage:', error);
+          }
+        },
+        removeItem: (name) => {
+          try {
+            localStorage.setItem(name, '');
+          } catch (error) {
+            console.error('Error removing from localStorage:', error);
+          }
+        },
+      },
     }
   )
 );

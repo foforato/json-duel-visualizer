@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
 import UrlForm from "@/components/UrlForm";
 import JsonDiffViewer from "@/components/JsonDiffViewer";
@@ -16,6 +15,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
+  // Fix: Initialize state before using store
+  const [storeReady, setStoreReady] = useState(false);
   const [leftJson, setLeftJson] = useState<any>(null);
   const [rightJson, setRightJson] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -24,7 +25,14 @@ const Index = () => {
   const [leftStatus, setLeftStatus] = useState<number | undefined>(undefined);
   const [rightStatus, setRightStatus] = useState<number | undefined>(undefined);
   const [compareMode, setCompareMode] = useState<"url" | "direct">("url");
-  const { addRequest } = useRequestStore();
+  
+  // Fix: Use store only after hydration
+  useEffect(() => {
+    setStoreReady(true);
+  }, []);
+  
+  // Fix: Conditional store access
+  const { addRequest } = storeReady ? useRequestStore() : { addRequest: () => {} };
   const isMobile = useIsMobile();
 
   // Form pour la comparaison directe de JSON
@@ -182,6 +190,10 @@ const Index = () => {
     setLeftError(undefined);
     setRightError(undefined);
   };
+
+  if (!storeReady) {
+    return <div className="flex justify-center items-center h-screen">Chargement...</div>;
+  }
 
   return (
     <SidebarProvider>
