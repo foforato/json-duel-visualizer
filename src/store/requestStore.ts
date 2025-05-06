@@ -31,7 +31,7 @@ interface RequestState {
   clearRequests: () => void;
 }
 
-// Fix: Create the store with proper initialization
+// Create the store with proper initialization
 export const useRequestStore = create<RequestState>()(
   persist(
     (set) => ({
@@ -45,7 +45,7 @@ export const useRequestStore = create<RequestState>()(
               timestamp: Date.now(),
             },
             ...state.savedRequests,
-          ].slice(0, 50), // Limiter à 50 entrées
+          ].slice(0, 50), // Limit to 50 entries
         })),
       removeRequest: (id) =>
         set((state) => ({
@@ -55,9 +55,12 @@ export const useRequestStore = create<RequestState>()(
     }),
     {
       name: "json-duel-requests",
-      // Fix: Add storage configuration
+      // Add storage configuration with better error handling
       storage: {
         getItem: (name) => {
+          // Only run in browser environment
+          if (typeof window === 'undefined') return null;
+          
           try {
             const value = localStorage.getItem(name);
             return value ? JSON.parse(value) : null;
@@ -67,6 +70,9 @@ export const useRequestStore = create<RequestState>()(
           }
         },
         setItem: (name, value) => {
+          // Only run in browser environment
+          if (typeof window === 'undefined') return;
+          
           try {
             localStorage.setItem(name, JSON.stringify(value));
           } catch (error) {
@@ -74,8 +80,11 @@ export const useRequestStore = create<RequestState>()(
           }
         },
         removeItem: (name) => {
+          // Only run in browser environment
+          if (typeof window === 'undefined') return;
+          
           try {
-            localStorage.setItem(name, '');
+            localStorage.removeItem(name);
           } catch (error) {
             console.error('Error removing from localStorage:', error);
           }

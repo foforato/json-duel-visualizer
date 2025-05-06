@@ -26,22 +26,30 @@ interface RequestHistoryProps {
 }
 
 const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
-  // Fix: Initialize state before using store
-  const [storeReady, setStoreReady] = useState(false);
+  // Initialize with empty array to avoid hydration mismatch
   const [requests, setRequests] = useState<SavedRequest[]>([]);
+  const [ready, setReady] = useState(false);
   
-  // Fix: Use store only after hydration
+  // Only access the store after component is mounted
   useEffect(() => {
-    setStoreReady(true);
+    setReady(true);
   }, []);
-  
-  const store = storeReady ? useRequestStore() : null;
-  
+
+  // Use store safely after component has mounted
   useEffect(() => {
-    if (store) {
-      setRequests(store.savedRequests);
+    if (ready) {
+      // Access store only after component is mounted
+      const savedRequests = useRequestStore.getState().savedRequests;
+      setRequests(savedRequests);
+      
+      // Subscribe to store changes
+      const unsubscribe = useRequestStore.subscribe(
+        (state) => setRequests([...state.savedRequests])
+      );
+      
+      return () => unsubscribe();
     }
-  }, [store, storeReady]);
+  }, [ready]);
 
   const handleSelectRequest = (request: SavedRequest) => {
     onSelectRequest(request);
@@ -51,17 +59,14 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
   };
 
   const handleClearRequests = () => {
-    if (store) {
-      store.clearRequests();
-      toast({
-        description: "Historique effacé",
-      });
+    if (ready) {
+      useRequestStore.getState().clearRequests();
     }
   };
 
   const handleRemoveRequest = (id: string) => {
-    if (store) {
-      store.removeRequest(id);
+    if (ready) {
+      useRequestStore.getState().removeRequest(id);
     }
   };
 
@@ -87,7 +92,7 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
           <SidebarGroupLabel>Requêtes sauvegardées</SidebarGroupLabel>
           <SidebarGroupContent>
             <ScrollArea className="h-[calc(100vh-150px)]">
-              {!storeReady ? (
+              {!ready ? (
                 <div className="px-2 py-4 text-center text-muted-foreground text-sm">
                   Chargement...
                 </div>

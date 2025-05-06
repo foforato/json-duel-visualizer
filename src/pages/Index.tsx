@@ -15,8 +15,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
-  // Fix: Initialize state before using store
-  const [storeReady, setStoreReady] = useState(false);
+  // State management
   const [leftJson, setLeftJson] = useState<any>(null);
   const [rightJson, setRightJson] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -25,17 +24,16 @@ const Index = () => {
   const [leftStatus, setLeftStatus] = useState<number | undefined>(undefined);
   const [rightStatus, setRightStatus] = useState<number | undefined>(undefined);
   const [compareMode, setCompareMode] = useState<"url" | "direct">("url");
+  const [ready, setReady] = useState(false);
   
-  // Fix: Use store only after hydration
+  // Set ready state after component is mounted
   useEffect(() => {
-    setStoreReady(true);
+    setReady(true);
   }, []);
   
-  // Fix: Conditional store access
-  const { addRequest } = storeReady ? useRequestStore() : { addRequest: () => {} };
   const isMobile = useIsMobile();
 
-  // Form pour la comparaison directe de JSON
+  // Form for direct JSON comparison
   const form = useForm({
     defaultValues: {
       leftJsonText: "",
@@ -76,8 +74,8 @@ const Index = () => {
       }
 
       // Save request to history if both fetches are successful
-      if (leftResponse.status === "fulfilled" && rightResponse.status === "fulfilled") {
-        addRequest({
+      if (leftResponse.status === "fulfilled" && rightResponse.status === "fulfilled" && ready) {
+        useRequestStore.getState().addRequest({
           name: `${request1.url.substring(0, 20)}... vs ${request2.url.substring(0, 20)}...`,
           request1,
           request2,
@@ -191,7 +189,7 @@ const Index = () => {
     setRightError(undefined);
   };
 
-  if (!storeReady) {
+  if (!ready) {
     return <div className="flex justify-center items-center h-screen">Chargement...</div>;
   }
 
