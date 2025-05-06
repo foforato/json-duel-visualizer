@@ -4,6 +4,16 @@ import { toast } from "@/components/ui/use-toast";
 import UrlForm from "@/components/UrlForm";
 import JsonDiffViewer from "@/components/JsonDiffViewer";
 import { ApiRequest } from "@/components/UrlForm";
+import RequestHistory from "@/components/RequestHistory";
+import { SavedRequest, useRequestStore } from "@/store/requestStore";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Drawer, DrawerTrigger, DrawerContent, DrawerClose } from "@/components/ui/drawer";
+import { Textarea } from "@/components/ui/textarea";
+import { useForm } from "react-hook-form";
+import { Form, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const [leftJson, setLeftJson] = useState<any>(null);
@@ -13,6 +23,17 @@ const Index = () => {
   const [rightError, setRightError] = useState<string | undefined>(undefined);
   const [leftStatus, setLeftStatus] = useState<number | undefined>(undefined);
   const [rightStatus, setRightStatus] = useState<number | undefined>(undefined);
+  const [compareMode, setCompareMode] = useState<"url" | "direct">("url");
+  const { addRequest } = useRequestStore();
+  const isMobile = useIsMobile();
+
+  // Form pour la comparaison directe de JSON
+  const form = useForm({
+    defaultValues: {
+      leftJsonText: "",
+      rightJsonText: "",
+    },
+  });
 
   const fetchData = async (request1: ApiRequest, request2: ApiRequest) => {
     setIsLoading(true);
@@ -44,6 +65,19 @@ const Index = () => {
       } else {
         setRightError(`Erreur: ${rightResponse.reason?.message || "Impossible de récupérer les données"}`);
         setRightJson(null);
+      }
+
+      // Save request to history if both fetches are successful
+      if (leftResponse.status === "fulfilled" && rightResponse.status === "fulfilled") {
+        addRequest({
+          name: `${request1.url.substring(0, 20)}... vs ${request2.url.substring(0, 20)}...`,
+          request1,
+          request2,
+          response1: leftResponse.status === "fulfilled" ? leftResponse.value.data : null,
+          response2: rightResponse.status === "fulfilled" ? rightResponse.value.data : null,
+          leftStatus: leftResponse.status === "fulfilled" ? leftResponse.value.status : undefined,
+          rightStatus: rightResponse.status === "fulfilled" ? rightResponse.value.status : undefined,
+        });
       }
     } catch (error) {
       toast({
@@ -114,30 +148,185 @@ const Index = () => {
     }
   };
 
+  const compareDirectJson = () => {
+    const values = form.getValues();
+    setLeftError(undefined);
+    setRightError(undefined);
+    
+    try {
+      const leftData = JSON.parse(values.leftJsonText || "null");
+      setLeftJson(leftData);
+    } catch (e) {
+      setLeftError("JSON invalide dans le premier champ");
+      setLeftJson(null);
+    }
+    
+    try {
+      const rightData = JSON.parse(values.rightJsonText || "null");
+      setRightJson(rightData);
+    } catch (e) {
+      setRightError("JSON invalide dans le second champ");
+      setRightJson(null);
+    }
+  };
+
+  const handleSelectSavedRequest = (request: SavedRequest) => {
+    if (compareMode === "direct") {
+      setCompareMode("url");
+    }
+    
+    setLeftJson(request.response1 || null);
+    setRightJson(request.response2 || null);
+    setLeftStatus(request.leftStatus);
+    setRightStatus(request.rightStatus);
+    setLeftError(undefined);
+    setRightError(undefined);
+  };
+
   return (
-    <div className="container py-8 max-w-7xl">
-      <header className="mb-8 text-center">
-        <h1 className="text-3xl font-bold mb-2">JSON Duel Visualizer</h1>
-        <p className="text-muted-foreground">
-          Comparez facilement les réponses de deux API REST
-        </p>
-      </header>
-      
-      <div className="mb-8">
-        <UrlForm onFetchData={fetchData} isLoading={isLoading} />
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <RequestHistory onSelectRequest={handleSelectSavedRequest} />
+        
+        <div className="flex-1 container py-8 max-w-7xl">
+          <header className="mb-8 text-center">
+            <h1 className="text-3xl font-bold mb-2">JSON Duel Visualizer</h1>
+            <p className="text-muted-foreground">
+              Comparez facilement les réponses de deux API REST ou des JSON bruts
+            </p>
+          </header>
+          
+          <div className="mb-8">
+            <Tabs 
+              value={compareMode} 
+              onValueChange={(value) => setCompareMode(value as "url" | "direct")}
+              className="w-full"
+            >
+              <TabsList className="grid grid-cols-2 mb-4 w-full md:w-[400px] mx-auto">
+                <TabsTrigger value="url">APIs (URLs)</TabsTrigger>
+                <TabsTrigger value="direct">JSON Direct</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="url">
+                <UrlForm onFetchData={fetchData} isLoading={isLoading} />
+              </TabsContent>
+              
+              <TabsContent value="direct">
+                {isMobile ? (
+                  <Drawer>
+                    <DrawerTrigger asChild>
+                      <Button className="w-full mb-4">Éditer les JSON</Button>
+                    </DrawerTrigger>
+                    <DrawerContent className="h-[80vh] p-4">
+                      <Form {...form}>
+                        <div className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="leftJsonText"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Premier JSON</FormLabel>
+                                <Textarea
+                                  placeholder='{"example": "value"}'
+                                  className="min-h-[200px] font-mono"
+                                  {...field}
+                                />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="rightJsonText"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Deuxième JSON</FormLabel>
+                                <Textarea
+                                  placeholder='{"example": "modified value"}'
+                                  className="min-h-[200px] font-mono"
+                                  {...field}
+                                />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <div className="flex justify-between">
+                            <Button 
+                              onClick={compareDirectJson}
+                              disabled={isLoading}
+                              type="button"
+                            >
+                              Comparer
+                            </Button>
+                            <DrawerClose asChild>
+                              <Button variant="outline">Fermer</Button>
+                            </DrawerClose>
+                          </div>
+                        </div>
+                      </Form>
+                    </DrawerContent>
+                  </Drawer>
+                ) : (
+                  <Form {...form}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="leftJsonText"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Premier JSON</FormLabel>
+                            <Textarea
+                              placeholder='{"example": "value"}'
+                              className="min-h-[200px] font-mono"
+                              {...field}
+                            />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="rightJsonText"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Deuxième JSON</FormLabel>
+                            <Textarea
+                              placeholder='{"example": "modified value"}'
+                              className="min-h-[200px] font-mono"
+                              {...field}
+                            />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <Button 
+                      onClick={compareDirectJson}
+                      className="mt-4"
+                      disabled={isLoading}
+                      type="button"
+                    >
+                      Comparer
+                    </Button>
+                  </Form>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          {(leftJson || rightJson || leftError || rightError) && (
+            <JsonDiffViewer
+              leftJson={leftJson}
+              rightJson={rightJson}
+              leftError={leftError}
+              rightError={rightError}
+              leftStatus={leftStatus}
+              rightStatus={rightStatus}
+            />
+          )}
+        </div>
       </div>
-      
-      {(leftJson || rightJson || leftError || rightError) && (
-        <JsonDiffViewer
-          leftJson={leftJson}
-          rightJson={rightJson}
-          leftError={leftError}
-          rightError={rightError}
-          leftStatus={leftStatus}
-          rightStatus={rightStatus}
-        />
-      )}
-    </div>
+    </SidebarProvider>
   );
 };
 
