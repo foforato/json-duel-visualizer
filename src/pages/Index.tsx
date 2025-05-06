@@ -75,15 +75,18 @@ const Index = () => {
 
       // Save request to history if both fetches are successful
       if (leftResponse.status === "fulfilled" && rightResponse.status === "fulfilled" && ready) {
-        useRequestStore.getState().addRequest({
-          name: `${request1.url.substring(0, 20)}... vs ${request2.url.substring(0, 20)}...`,
-          request1,
-          request2,
-          response1: leftResponse.status === "fulfilled" ? leftResponse.value.data : null,
-          response2: rightResponse.status === "fulfilled" ? rightResponse.value.data : null,
-          leftStatus: leftResponse.status === "fulfilled" ? leftResponse.value.status : undefined,
-          rightStatus: rightResponse.status === "fulfilled" ? rightResponse.value.status : undefined,
-        });
+        const store = useRequestStore.getState();
+        if (store && typeof store.addRequest === 'function') {
+          store.addRequest({
+            name: `${request1.url.substring(0, 20)}... vs ${request2.url.substring(0, 20)}...`,
+            request1,
+            request2,
+            response1: leftResponse.status === "fulfilled" ? leftResponse.value.data : null,
+            response2: rightResponse.status === "fulfilled" ? rightResponse.value.data : null,
+            leftStatus: leftResponse.status === "fulfilled" ? leftResponse.value.status : undefined,
+            rightStatus: rightResponse.status === "fulfilled" ? rightResponse.value.status : undefined,
+          });
+        }
       }
     } catch (error) {
       toast({

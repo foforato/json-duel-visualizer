@@ -111,10 +111,16 @@ export const useRequestStore = (() => {
   // Make sure store is only accessed in browser environment
   if (typeof window === 'undefined') {
     return {
-      getState: () => ({ savedRequests: [] }),
+      getState: () => ({ 
+        savedRequests: [],
+        addRequest: () => {},
+        removeRequest: () => {},
+        clearRequests: () => {},
+        updateRequestStats: () => {}
+      }),
       setState: () => {},
       subscribe: () => () => {},
-    };
+    } as typeof useRequestStoreBase;
   }
   return useRequestStoreBase;
 })();

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useRequestStore, type SavedRequest } from "@/store/requestStore";
 import { formatDistanceToNow } from "date-fns";
@@ -40,8 +39,8 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
   useEffect(() => {
     if (ready) {
       // Access store only after component is mounted
-      const savedRequests = useRequestStore.getState().savedRequests;
-      setRequests(savedRequests);
+      const storeState = useRequestStore.getState();
+      setRequests(storeState.savedRequests);
       
       // Subscribe to store changes
       const unsubscribe = useRequestStore.subscribe(
@@ -61,13 +60,19 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
 
   const handleClearRequests = () => {
     if (ready) {
-      useRequestStore.getState().clearRequests();
+      const store = useRequestStore.getState();
+      if (store && typeof store.clearRequests === 'function') {
+        store.clearRequests();
+      }
     }
   };
 
   const handleRemoveRequest = (id: string) => {
     if (ready) {
-      useRequestStore.getState().removeRequest(id);
+      const store = useRequestStore.getState();
+      if (store && typeof store.removeRequest === 'function') {
+        store.removeRequest(id);
+      }
     }
   };
   
