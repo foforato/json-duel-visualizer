@@ -35,6 +35,16 @@
 
     --radius: 0.5rem;
 
+    /* Couleurs pour la visualisation des différences */
+    --added: 142 71% 45%;
+    --added-foreground: 142 76% 36%;
+    
+    --removed: 0 84.2% 60.2%;
+    --removed-foreground: 0 72% 51%;
+    
+    --modified: 48 96% 53%;
+    --modified-foreground: 38 92% 50%;
+
     --sidebar-background: 0 0% 98%;
 
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -80,6 +90,17 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+
+    /* Couleurs pour la visualisation des différences en mode sombre */
+    --added: 142 71% 45%;
+    --added-foreground: 142 76% 36%;
+    
+    --removed: 0 84.2% 60.2%;
+    --removed-foreground: 0 72% 51%;
+    
+    --modified: 48 96% 53%;
+    --modified-foreground: 38 92% 50%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -102,5 +123,29 @@
   
   .json-diff-view {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+}
+
+/* Personnalisation de la barre de défilement pour une meilleure UX */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
   }
 }
