@@ -11,7 +11,7 @@ interface JsonViewProps {
   onlyShowDiff?: boolean;
   searchTerm?: string;
   defaultExpanded?: boolean;
-  onUpdateDiffCount?: (count: number) => void;
+  onUpdateDiffCount?: (count: number, identicalCount?: number) => void;
 }
 
 const JsonView: React.FC<JsonViewProps> = ({
@@ -26,6 +26,7 @@ const JsonView: React.FC<JsonViewProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const diffCountRef = useRef<number>(0);
+  const identicalCountRef = useRef<number>(0);
   const isRoot = path.length === 0;
   
   // Update expansion state when defaultExpanded changes
@@ -49,7 +50,7 @@ const JsonView: React.FC<JsonViewProps> = ({
   // Report diff count to parent (only from root component)
   useEffect(() => {
     if (isRoot && diffMode && onUpdateDiffCount) {
-      onUpdateDiffCount(diffCountRef.current);
+      onUpdateDiffCount(diffCountRef.current, identicalCountRef.current);
     }
   }, [isRoot, diffMode, onUpdateDiffCount, data, diffData]);
   
@@ -57,6 +58,7 @@ const JsonView: React.FC<JsonViewProps> = ({
   useEffect(() => {
     if (isRoot) {
       diffCountRef.current = 0;
+      identicalCountRef.current = 0;
     }
   }, [isRoot]);
   
@@ -102,16 +104,18 @@ const JsonView: React.FC<JsonViewProps> = ({
           {JSON.stringify(data)}
         </span>
       );
+    } else {
+      // Value is identical
+      if (isRoot) identicalCountRef.current++;
+      return (
+        <span className={cn(
+          "break-all",
+          matchesSearch && "bg-yellow-100 px-1 rounded"
+        )}>
+          {JSON.stringify(data)}
+        </span>
+      );
     }
-    
-    return (
-      <span className={cn(
-        "break-all",
-        matchesSearch && "bg-yellow-100 px-1 rounded"
-      )}>
-        {JSON.stringify(data)}
-      </span>
-    );
   }
 
   // For objects and arrays
@@ -151,6 +155,8 @@ const JsonView: React.FC<JsonViewProps> = ({
           if (isDifferent) {
             hasDifferences = true;
             if (isRoot) diffCountRef.current++;
+          } else if (isRoot) {
+            identicalCountRef.current++;
           }
           return isDifferent || hasSearchMatch(value);
         }
@@ -177,6 +183,8 @@ const JsonView: React.FC<JsonViewProps> = ({
         if (isDifferent) {
           hasDifferences = true;
           if (isRoot) diffCountRef.current++;
+        } else if (isRoot) {
+          identicalCountRef.current++;
         }
         
         // Include in results if different or matches search
@@ -303,6 +311,7 @@ const JsonView: React.FC<JsonViewProps> = ({
                       onlyShowDiff={onlyShowDiff}
                       searchTerm={searchTerm}
                       defaultExpanded={defaultExpanded}
+                      onUpdateDiffCount={onUpdateDiffCount}
                     />
                   </React.Fragment>
                 </div>

@@ -16,7 +16,7 @@ import {
   SidebarMenuButton,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { Trash, Clock, Database } from "lucide-react";
+import { Trash, Clock, Database, ArrowUpDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
@@ -29,6 +29,7 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
   // Initialize with empty array to avoid hydration mismatch
   const [requests, setRequests] = useState<SavedRequest[]>([]);
   const [ready, setReady] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "similarity">("newest");
   
   // Only access the store after component is mounted
   useEffect(() => {
@@ -69,40 +70,107 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
       useRequestStore.getState().removeRequest(id);
     }
   };
+  
+  // Function to sort requests based on current sort order
+  const getSortedRequests = () => {
+    if (!requests) return [];
+    
+    switch (sortOrder) {
+      case "oldest":
+        return [...requests].sort((a, b) => a.timestamp - b.timestamp);
+      case "similarity":
+        return [...requests].sort((a, b) => {
+          const similarityA = a.stats?.similarity ?? 0;
+          const similarityB = b.stats?.similarity ?? 0;
+          return similarityB - similarityA; // Higher similarity first
+        });
+      case "newest":
+      default:
+        return requests; // Already sorted by newest
+    }
+  };
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(current => {
+      if (current === "newest") return "oldest";
+      if (current === "oldest") return "similarity";
+      return "newest";
+    });
+  };
+  
+  // Get sort label
+  const getSortLabel = () => {
+    switch (sortOrder) {
+      case "oldest": return "Anciennes";
+      case "similarity": return "Similarité";
+      case "newest": return "Récentes";
+    }
+  };
+  
+  // Format similarity badge
+  const formatSimilarityBadge = (similarity?: number) => {
+    if (similarity === undefined) return null;
+    
+    let variant: "default" | "outline" | "destructive" = "outline";
+    if (similarity > 75) variant = "default";
+    if (similarity < 40) variant = "destructive";
+    
+    return (
+      <Badge variant={variant} className="ml-1">
+        {similarity}%
+      </Badge>
+    );
+  };
 
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center justify-between px-2">
           <h2 className="text-lg font-semibold">Historique</h2>
-          {requests.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearRequests}
-            >
-              <Trash className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="flex gap-1">
+            {requests.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleSortOrder}
+                className="h-8"
+                title={`Trier par : ${getSortLabel()}`}
+              >
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+            )}
+            {requests.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearRequests}
+                className="h-8"
+                title="Effacer l'historique"
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </SidebarHeader>
       
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Requêtes sauvegardées</SidebarGroupLabel>
+          <SidebarGroupLabel>Tri : {getSortLabel()}</SidebarGroupLabel>
           <SidebarGroupContent>
             <ScrollArea className="h-[calc(100vh-150px)]">
               {!ready ? (
                 <div className="px-2 py-4 text-center text-muted-foreground text-sm">
                   Chargement...
                 </div>
-              ) : requests.length === 0 ? (
+              ) : getSortedRequests().length === 0 ? (
                 <div className="px-2 py-4 text-center text-muted-foreground text-sm">
                   Aucune requête sauvegardée
                 </div>
               ) : (
                 <SidebarMenu>
-                  {requests.map((request) => (
+                  {getSortedRequests().map((request) => (
                     <SidebarMenuItem key={request.id}>
                       <SidebarMenuButton
                         onClick={() => handleSelectRequest(request)}
@@ -110,7 +178,10 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
                       >
                         <Database className="h-4 w-4" />
                         <div className="flex flex-col items-start">
-                          <span className="truncate w-full text-left">{request.name}</span>
+                          <div className="flex items-center">
+                            <span className="truncate w-full text-left">{request.name}</span>
+                            {formatSimilarityBadge(request.stats?.similarity)}
+                          </div>
                           <span className="text-xs text-muted-foreground flex items-center">
                             <Clock className="h-3 w-3 mr-1" />
                             {formatDistanceToNow(new Date(request.timestamp), { 

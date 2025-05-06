@@ -22,6 +22,11 @@ export interface SavedRequest {
   response2?: any;
   leftStatus?: number;
   rightStatus?: number;
+  stats?: {
+    identical: number;
+    differences: number;
+    similarity: number;
+  };
 }
 
 interface RequestState {
@@ -29,10 +34,11 @@ interface RequestState {
   addRequest: (request: Omit<SavedRequest, "id" | "timestamp">) => void;
   removeRequest: (id: string) => void;
   clearRequests: () => void;
+  updateRequestStats: (id: string, stats: { identical: number; differences: number; similarity: number }) => void;
 }
 
 // Create the store with proper initialization
-export const useRequestStore = create<RequestState>()(
+const useRequestStoreBase = create<RequestState>()(
   persist(
     (set) => ({
       savedRequests: [],
@@ -52,6 +58,12 @@ export const useRequestStore = create<RequestState>()(
           savedRequests: state.savedRequests.filter((req) => req.id !== id),
         })),
       clearRequests: () => set({ savedRequests: [] }),
+      updateRequestStats: (id, stats) =>
+        set((state) => ({
+          savedRequests: state.savedRequests.map((req) => 
+            req.id === id ? { ...req, stats } : req
+          ),
+        })),
     }),
     {
       name: "json-duel-requests",
@@ -93,3 +105,16 @@ export const useRequestStore = create<RequestState>()(
     }
   )
 );
+
+// Prevent SSR issues by creating a wrapper around the store
+export const useRequestStore = (() => {
+  // Make sure store is only accessed in browser environment
+  if (typeof window === 'undefined') {
+    return {
+      getState: () => ({ savedRequests: [] }),
+      setState: () => {},
+      subscribe: () => () => {},
+    };
+  }
+  return useRequestStoreBase;
+})();

@@ -1,6 +1,6 @@
 
-import React, { useState, useCallback } from "react";
-import { Search, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { Search, Copy, ChevronDown, ChevronUp, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import JsonView from "./JsonView";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 interface JsonDiffViewerProps {
   leftJson: any;
@@ -31,6 +32,25 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [expandAll, setExpandAll] = useState(true);
   const [diffCount, setDiffCount] = useState<number | null>(null);
+  const [syncScroll, setSyncScroll] = useState(true);
+  const [currentDiffIndex, setCurrentDiffIndex] = useState<number>(0);
+  const [diffElements, setDiffElements] = useState<HTMLElement[]>([]);
+  
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  
+  const [scrolling, setScrolling] = useState<string | null>(null);
+  
+  // Stats
+  const [stats, setStats] = useState<{
+    identical: number;
+    differences: number;
+    similarity: number;
+  }>({
+    identical: 0,
+    differences: 0,
+    similarity: 0
+  });
   
   const handleViewModeChange = (value: string) => {
     setViewMode(value as "split" | "unified");
@@ -59,9 +79,105 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
       });
   }, []);
 
-  const updateDiffCount = useCallback((count: number) => {
+  const updateDiffCount = useCallback((count: number, identicalCount?: number) => {
     setDiffCount(count);
+    
+    if (identicalCount !== undefined) {
+      const total = count + identicalCount;
+      const similarity = total > 0 ? Math.round((identicalCount / total) * 100) : 0;
+      
+      setStats({
+        identical: identicalCount,
+        differences: count,
+        similarity
+      });
+    }
   }, []);
+  
+  // Collect all diff elements
+  useEffect(() => {
+    if (diffCount !== null) {
+      // Find all elements with background colors indicating diffs
+      const diffNodes = document.querySelectorAll('.bg-modified\\/10, .bg-removed\\/10, .bg-added\\/10');
+      setDiffElements(Array.from(diffNodes) as HTMLElement[]);
+      
+      // Reset current diff index
+      setCurrentDiffIndex(0);
+    }
+  }, [diffCount, viewMode]);
+  
+  // Navigate to a specific diff element
+  const navigateToDiff = useCallback((index: number) => {
+    if (!diffElements.length) return;
+    
+    // Ensure index is within bounds
+    const safeIndex = Math.max(0, Math.min(diffElements.length - 1, index));
+    setCurrentDiffIndex(safeIndex);
+    
+    // Scroll to the element
+    const element = diffElements[safeIndex];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // Add a temporary highlight
+      element.classList.add('animate-pulse', 'ring-2', 'ring-primary');
+      setTimeout(() => {
+        element.classList.remove('animate-pulse', 'ring-2', 'ring-primary');
+      }, 1500);
+    }
+  }, [diffElements]);
+  
+  const goToNextDiff = () => {
+    navigateToDiff(currentDiffIndex + 1);
+  };
+  
+  const goToPrevDiff = () => {
+    navigateToDiff(currentDiffIndex - 1);
+  };
+  
+  // Synchronized scrolling
+  useEffect(() => {
+    if (!syncScroll || viewMode !== "split") return;
+    
+    const handleScroll = (source: string, e: Event) => {
+      if (scrolling !== null && scrolling !== source) return;
+      
+      const sourceEl = e.target as HTMLElement;
+      const targetEl = source === 'left' ? rightPanelRef.current : leftPanelRef.current;
+      
+      if (targetEl && sourceEl) {
+        setScrolling(source);
+        
+        // Calculate scroll percentages
+        const sourceScrollMax = sourceEl.scrollHeight - sourceEl.clientHeight;
+        const scrollPercent = sourceScrollMax > 0 ? sourceEl.scrollTop / sourceScrollMax : 0;
+        
+        const targetScrollMax = targetEl.scrollHeight - targetEl.clientHeight;
+        const targetScrollPosition = scrollPercent * targetScrollMax;
+        
+        targetEl.scrollTop = targetScrollPosition;
+        
+        // Reset scrolling state after a short delay
+        setTimeout(() => setScrolling(null), 50);
+      }
+    };
+    
+    const leftEl = leftPanelRef.current;
+    const rightEl = rightPanelRef.current;
+    
+    if (leftEl) {
+      leftEl.addEventListener('scroll', (e) => handleScroll('left', e));
+    }
+    
+    if (rightEl) {
+      rightEl.addEventListener('scroll', (e) => handleScroll('right', e));
+    }
+    
+    return () => {
+      leftEl?.removeEventListener('scroll', (e) => handleScroll('left', e));
+      rightEl?.removeEventListener('scroll', (e) => handleScroll('right', e));
+    };
+  }, [syncScroll, viewMode, scrolling]);
 
   // Helper function to format HTTP status
   const formatStatusCode = (status?: number) => {
@@ -105,6 +221,18 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
             </Label>
           </div>
           
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="sync-scroll"
+              checked={syncScroll}
+              onCheckedChange={setSyncScroll}
+              disabled={viewMode !== "split"}
+            />
+            <Label htmlFor="sync-scroll">
+              Synchroniser le défilement
+            </Label>
+          </div>
+          
           <Tabs value={viewMode} onValueChange={handleViewModeChange} className="w-full sm:w-auto">
             <TabsList className="grid grid-cols-2 w-full sm:w-[200px]">
               <TabsTrigger value="split">Côte à côte</TabsTrigger>
@@ -143,14 +271,59 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
                 </>
               )}
             </Button>
+            
+            {diffCount && diffCount > 0 && (
+              <div className="flex gap-1">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPrevDiff}
+                  disabled={currentDiffIndex <= 0}
+                  title="Différence précédente"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextDiff}
+                  disabled={currentDiffIndex >= diffElements.length - 1}
+                  title="Différence suivante"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
+                <Badge variant="outline" className="flex items-center">
+                  {currentDiffIndex + 1} / {diffElements.length}
+                </Badge>
+              </div>
+            )}
           </div>
         </div>
       </div>
       
+      {diffCount !== null && (
+        <div className="flex justify-center mb-2">
+          <div className="bg-card rounded-lg border p-2 text-sm flex flex-wrap gap-4 items-center justify-center">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Similarité :</span>
+              <Badge variant={stats.similarity > 75 ? "default" : stats.similarity > 50 ? "outline" : "destructive"}>
+                {stats.similarity}%
+              </Badge>
+            </div>
+            <div>
+              <span className="font-medium">Identiques :</span> {stats.identical}
+            </div>
+            <div>
+              <span className="font-medium">Différences :</span> {stats.differences}
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="bg-white border rounded-lg shadow">
         {viewMode === "split" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x">
-            <div className="p-4 overflow-auto max-h-[70vh]">
+            <div ref={leftPanelRef} className="p-4 overflow-auto max-h-[70vh]">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-sm font-medium flex items-center gap-2">
                   Premier JSON
@@ -186,7 +359,7 @@ const JsonDiffViewer: React.FC<JsonDiffViewerProps> = ({
               )}
             </div>
             
-            <div className="p-4 overflow-auto max-h-[70vh]">
+            <div ref={rightPanelRef} className="p-4 overflow-auto max-h-[70vh]">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-sm font-medium flex items-center gap-2">
                   Deuxième JSON
