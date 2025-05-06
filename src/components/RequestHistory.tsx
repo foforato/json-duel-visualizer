@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useRequestStore, type SavedRequest } from "@/store/requestStore";
 import { formatDistanceToNow } from "date-fns";
@@ -15,10 +16,21 @@ import {
   SidebarMenuButton,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { Trash, Clock, Database, ArrowUpDown } from "lucide-react";
+import { Trash, Clock, Database, ArrowUpDown, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface RequestHistoryProps {
   onSelectRequest: (request: SavedRequest) => void;
@@ -35,7 +47,7 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
     setReady(true);
   }, []);
 
-  // Use store safely after component has mounted
+  // Use store safely after component is mounted
   useEffect(() => {
     if (ready) {
       // Access store only after component is mounted
@@ -128,6 +140,45 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
     );
   };
 
+  // Format request details for tooltip/popover
+  const formatRequestDetails = (request: SavedRequest) => {
+    return (
+      <div className="space-y-2 text-xs">
+        <div>
+          <strong>Requête 1:</strong>
+          <div>{request.request1.method} {request.request1.url}</div>
+          {request.request1.headers.length > 0 && (
+            <div>
+              <div className="font-semibold mt-1">En-têtes:</div>
+              <ul className="list-disc pl-4">
+                {request.request1.headers.map((h, i) => (
+                  <li key={i}>{h.key}: {h.value}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {request.leftStatus && <div className="mt-1">Status: {request.leftStatus}</div>}
+        </div>
+        
+        <div>
+          <strong>Requête 2:</strong>
+          <div>{request.request2.method} {request.request2.url}</div>
+          {request.request2.headers.length > 0 && (
+            <div>
+              <div className="font-semibold mt-1">En-têtes:</div>
+              <ul className="list-disc pl-4">
+                {request.request2.headers.map((h, i) => (
+                  <li key={i}>{h.key}: {h.value}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {request.rightStatus && <div className="mt-1">Status: {request.rightStatus}</div>}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader>
@@ -176,10 +227,11 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
               ) : (
                 <SidebarMenu>
                   {getSortedRequests().map((request) => (
-                    <SidebarMenuItem key={request.id}>
+                    <SidebarMenuItem key={request.id} className="relative">
                       <SidebarMenuButton
                         onClick={() => handleSelectRequest(request)}
                         tooltip={`${request.request1.url} vs ${request.request2.url}`}
+                        className="pr-8"
                       >
                         <Database className="h-4 w-4" />
                         <div className="flex flex-col items-start">
@@ -196,6 +248,33 @@ const RequestHistory: React.FC<RequestHistoryProps> = ({ onSelectRequest }) => {
                           </span>
                         </div>
                       </SidebarMenuButton>
+                      
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 absolute right-1 top-1/2 -translate-y-1/2"
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                          {formatRequestDetails(request)}
+                        </PopoverContent>
+                      </Popover>
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 absolute right-1 bottom-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveRequest(request.id);
+                        }}
+                      >
+                        <Trash className="h-3 w-3" />
+                      </Button>
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>

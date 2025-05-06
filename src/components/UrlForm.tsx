@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RefreshCw, Clipboard, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
@@ -11,6 +11,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 interface UrlFormProps {
   onFetchData: (request1: ApiRequest, request2: ApiRequest) => void;
   isLoading: boolean;
+  initialRequest1?: ApiRequest;
+  initialRequest2?: ApiRequest;
 }
 
 export interface ApiRequest {
@@ -29,13 +31,14 @@ const DEFAULT_HEADERS = [
   { name: "User-Agent", value: "JSON-Duel-Client" },
 ];
 
-const UrlForm = ({ onFetchData, isLoading }: UrlFormProps) => {
+const UrlForm = ({ onFetchData, isLoading, initialRequest1, initialRequest2 }: UrlFormProps) => {
   const [request1, setRequest1] = useState<ApiRequest>({
     url: "",
     method: "GET",
     headers: [],
     body: "",
   });
+  
   const [request2, setRequest2] = useState<ApiRequest>({
     url: "",
     method: "GET",
@@ -43,11 +46,31 @@ const UrlForm = ({ onFetchData, isLoading }: UrlFormProps) => {
     body: "",
   });
   
+  // Initialize form with initial values if provided
+  useEffect(() => {
+    if (initialRequest1) {
+      setRequest1(initialRequest1);
+    }
+    if (initialRequest2) {
+      setRequest2(initialRequest2);
+    }
+  }, [initialRequest1, initialRequest2]);
+  
   const [urlError1, setUrlError1] = useState<string>("");
   const [urlError2, setUrlError2] = useState<string>("");
   
   const [advancedMode1, setAdvancedMode1] = useState<boolean>(false);
   const [advancedMode2, setAdvancedMode2] = useState<boolean>(false);
+
+  // Automatically open advanced mode if there are headers or body
+  useEffect(() => {
+    if ((initialRequest1?.headers && initialRequest1.headers.length > 0) || initialRequest1?.body) {
+      setAdvancedMode1(true);
+    }
+    if ((initialRequest2?.headers && initialRequest2.headers.length > 0) || initialRequest2?.body) {
+      setAdvancedMode2(true);
+    }
+  }, [initialRequest1, initialRequest2]);
 
   const validateUrl = (url: string): boolean => {
     if (!url.trim()) {

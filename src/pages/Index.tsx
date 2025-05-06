@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
 import UrlForm from "@/components/UrlForm";
@@ -25,6 +26,8 @@ const Index = () => {
   const [rightStatus, setRightStatus] = useState<number | undefined>(undefined);
   const [compareMode, setCompareMode] = useState<"url" | "direct">("url");
   const [ready, setReady] = useState(false);
+  const [currentRequest1, setCurrentRequest1] = useState<ApiRequest | null>(null);
+  const [currentRequest2, setCurrentRequest2] = useState<ApiRequest | null>(null);
   
   // Set ready state after component is mounted
   useEffect(() => {
@@ -47,6 +50,8 @@ const Index = () => {
     setRightError(undefined);
     setLeftStatus(undefined);
     setRightStatus(undefined);
+    setCurrentRequest1(request1);
+    setCurrentRequest2(request2);
     
     try {
       // Fetch data from both URLs in parallel
@@ -78,7 +83,7 @@ const Index = () => {
         const store = useRequestStore.getState();
         if (store && typeof store.addRequest === 'function') {
           store.addRequest({
-            name: `${request1.url.substring(0, 20)}... vs ${request2.url.substring(0, 20)}...`,
+            name: generateRequestName(request1, request2),
             request1,
             request2,
             response1: leftResponse.status === "fulfilled" ? leftResponse.value.data : null,
@@ -97,6 +102,25 @@ const Index = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Generate a more meaningful name for the request
+  const generateRequestName = (request1: ApiRequest, request2: ApiRequest) => {
+    // Extract domain or path parts for better readability
+    const getDisplayName = (url: string) => {
+      try {
+        const urlObj = new URL(url);
+        return urlObj.hostname || url.substring(0, 20);
+      } catch (e) {
+        // If URL parsing fails, just use the original string
+        return url.substring(0, 20);
+      }
+    };
+    
+    const name1 = getDisplayName(request1.url);
+    const name2 = getDisplayName(request2.url);
+    
+    return `${request1.method} ${name1} vs ${request2.method} ${name2}`;
   };
 
   // Helper function to fetch with full request configuration
@@ -177,6 +201,37 @@ const Index = () => {
       setRightError("JSON invalide dans le second champ");
       setRightJson(null);
     }
+    
+    // Save direct JSON comparison to history
+    if (leftJson && rightJson && ready) {
+      const directRequest1: ApiRequest = {
+        url: "Direct JSON Input (Left)",
+        method: "DIRECT",
+        headers: [],
+        body: values.leftJsonText,
+      };
+      
+      const directRequest2: ApiRequest = {
+        url: "Direct JSON Input (Right)",
+        method: "DIRECT",
+        headers: [],
+        body: values.rightJsonText,
+      };
+      
+      setCurrentRequest1(directRequest1);
+      setCurrentRequest2(directRequest2);
+      
+      const store = useRequestStore.getState();
+      if (store && typeof store.addRequest === 'function') {
+        store.addRequest({
+          name: "Comparaison JSON directe",
+          request1: directRequest1,
+          request2: directRequest2,
+          response1: leftJson,
+          response2: rightJson,
+        });
+      }
+    }
   };
 
   const handleSelectSavedRequest = (request: SavedRequest) => {
@@ -190,6 +245,8 @@ const Index = () => {
     setRightStatus(request.rightStatus);
     setLeftError(undefined);
     setRightError(undefined);
+    setCurrentRequest1(request.request1);
+    setCurrentRequest2(request.request2);
   };
 
   if (!ready) {
@@ -221,7 +278,12 @@ const Index = () => {
               </TabsList>
               
               <TabsContent value="url">
-                <UrlForm onFetchData={fetchData} isLoading={isLoading} />
+                <UrlForm 
+                  onFetchData={fetchData} 
+                  isLoading={isLoading}
+                  initialRequest1={currentRequest1 || undefined}
+                  initialRequest2={currentRequest2 || undefined}
+                />
               </TabsContent>
               
               <TabsContent value="direct">
