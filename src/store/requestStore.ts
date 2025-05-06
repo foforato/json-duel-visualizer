@@ -116,21 +116,36 @@ const initialState: RequestState = {
   updateRequestStats: () => {}
 };
 
-// Use type assertion to safely handle SSR
-export const useRequestStore = typeof window !== 'undefined' 
-  ? useRequestStoreBase 
-  : ((() => {
-      let storeState = initialState;
-      
-      const store = () => storeState;
-      
-      // Add all the required methods to make TypeScript happy
-      store.getState = () => storeState;
-      store.setState = () => {};
-      store.subscribe = () => () => {};
-      store.getInitialState = () => initialState;
-      store.destroy = () => {};
-      
-      // Return the store with proper type assertion
-      return store as typeof useRequestStoreBase;
-    })());
+// Create a type for our store
+type RequestStore = typeof useRequestStoreBase;
+
+// Server-side rendering safe store
+export const useRequestStore = 
+  typeof window !== 'undefined' 
+    ? useRequestStoreBase 
+    : ((() => {
+        // Create a function that returns the initialState
+        const useStore = () => initialState;
+        
+        // Add the required properties to make TypeScript happy
+        useStore.getState = () => initialState;
+        useStore.setState = () => {};
+        useStore.subscribe = () => () => {};
+        useStore.getInitialState = () => initialState;
+        useStore.destroy = () => {};
+        useStore.persist = {
+          setOptions: () => {},
+          clearStorage: () => {},
+          rehydrate: () => Promise.resolve(),
+          hasHydrated: () => false,
+          onHydrate: () => () => {},
+          onFinishHydration: () => () => {},
+          getOptions: () => ({
+            name: "json-duel-requests",
+            storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+          })
+        };
+        
+        // Cast to unknown first, then to the expected type
+        return useStore as unknown as RequestStore;
+      })());
